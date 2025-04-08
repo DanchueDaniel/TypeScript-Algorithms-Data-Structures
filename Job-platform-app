@@ -1,0 +1,107 @@
+// Project: TypeScript Algorithms & Job Platform
+
+// --- Backend: Node.js + Express + MySQL ---
+// File: server.ts
+import express from 'express';
+import cors from 'cors';
+import mysql from 'mysql2';
+
+const app = express();
+app.use(cors());
+app.use(express.json());
+
+const db = mysql.createConnection({
+  host: 'localhost',
+  user: 'root',
+  password: 'your_password',
+  database: 'job_platform'
+});
+
+db.connect(err => {
+  if (err) throw err;
+  console.log('MySQL Connected');
+});
+
+// Job listings
+app.get('/jobs', (req, res) => {
+  const filters = req.query;
+  let sql = 'SELECT * FROM jobs WHERE 1=1';
+  if (filters.location) sql += ` AND location = '${filters.location}'`;
+  if (filters.category) sql += ` AND category = '${filters.category}'`;
+  db.query(sql, (err, result) => {
+    if (err) throw err;
+    res.send(result);
+  });
+});
+
+// Post job
+app.post('/jobs', (req, res) => {
+  const job = req.body;
+  const sql = 'INSERT INTO jobs SET ?';
+  db.query(sql, job, (err, result) => {
+    if (err) throw err;
+    res.send({ id: result.insertId });
+  });
+});
+
+// Upload resume and apply
+app.post('/apply', (req, res) => {
+  const { jobId, userId, resumeUrl } = req.body;
+  const sql = 'INSERT INTO applications SET ?';
+  db.query(sql, { jobId, userId, resumeUrl }, (err, result) => {
+    if (err) throw err;
+    res.send({ id: result.insertId });
+  });
+});
+
+// Get user profile
+app.get('/user/:id', (req, res) => {
+  const id = req.params.id;
+  db.query('SELECT * FROM users WHERE id = ?', [id], (err, result) => {
+    if (err) throw err;
+    res.send(result[0]);
+  });
+});
+
+app.listen(3000, () => console.log('Server running on port 3000'));
+
+
+// --- Frontend: Angular Example (Job List Component) ---
+// File: job-list.component.ts
+import { Component, OnInit } from '@angular/core';
+import { HttpClient } from '@angular/common/http';
+
+@Component({
+  selector: 'app-job-list',
+  templateUrl: './job-list.component.html'
+})
+export class JobListComponent implements OnInit {
+  jobs: any[] = [];
+  filters = { location: '', category: '' };
+
+  constructor(private http: HttpClient) {}
+
+  ngOnInit() {
+    this.loadJobs();
+  }
+
+  loadJobs() {
+    this.http.get<any[]>('http://localhost:3000/jobs', { params: this.filters })
+      .subscribe(data => this.jobs = data);
+  }
+}
+
+// File: job-list.component.html
+<div>
+  <input [(ngModel)]="filters.location" placeholder="Location" />
+  <input [(ngModel)]="filters.category" placeholder="Category" />
+  <button (click)="loadJobs()">Search</button>
+
+  <ul>
+    <li *ngFor="let job of jobs">
+      <h3>{{ job.title }}</h3>
+      <p>{{ job.description }}</p>
+      <p><strong>Location:</strong> {{ job.location }}</p>
+    </li>
+  </ul>
+</div>
